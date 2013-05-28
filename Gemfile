@@ -2,6 +2,7 @@ source 'https://rubygems.org'
 
 # Add dependencies required to use your gem here.
 gem "thor", ">= 0.14.0"
+gem "filetree", ">= 0.0.3"
 
 # Add dependencies to develop your gem here.
 # Include everything needed to run rake, tests, features, etc.

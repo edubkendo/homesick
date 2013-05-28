@@ -1,4 +1,4 @@
-require 'spec_helper' 
+require 'spec_helper'
 
 describe "homesick" do
   let(:home) { create_construct }
@@ -118,6 +118,62 @@ describe "homesick" do
         homesick.symlink("glencairn")
 
         existing_dotdir_link.readlink.should == dotdir
+      end
+    end
+
+    describe 'manifest' do
+
+      it 'should symlink and merge nested files when their parents are listed' do
+
+        manifest = Pathname.new(castle.parent.join('.manifest'))
+        relative_path = Pathname.new('some/nested/file.txt')
+        some_nested_file = castle.file(relative_path)
+
+        File.open(manifest, 'w') do |f|
+          f.puts relative_path.parent
+        end
+
+        homesick.symlink('glencairn')
+
+        home.join(relative_path).readlink.should == some_nested_file
+      end
+
+      it 'should symlink and merge nested directories when their parents are listed' do
+
+        manifest = Pathname.new(castle.parent.join('.manifest'))
+        relative_path = Pathname.new('some/nested/dir')
+        some_nested_dir = castle.directory(relative_path)
+
+        File.open(manifest, 'w') do |f|
+          f.puts relative_path.parent
+        end
+
+        homesick.symlink('glencairn')
+
+        home.join(relative_path).readlink.should == some_nested_dir
+      end
+
+      context 'the parent and descendant are both listed in the manifest' do
+
+        it 'does not symlink the dir containing the other listed file' do
+
+          manifest = Pathname.new(castle.parent.join('.manifest'))
+
+          relative_path = Pathname.new('some/nested/dir')
+          deeper_rel_path = Pathname.new(relative_path.join('deeper/inside'))
+
+          deeper_nested_inside = castle.file(deeper_rel_path)
+
+          File.open(manifest, 'w') do |f|
+            f.puts relative_path.parent
+            f.puts deeper_rel_path.parent
+          end
+
+          homesick.symlink('glencairn')
+
+          home.join(relative_path).symlink?.should == false
+          home.join(deeper_rel_path).readlink.should == deeper_nested_inside
+        end
       end
     end
   end

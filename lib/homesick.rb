@@ -94,16 +94,33 @@ class Homesick < Thor
   method_option :force, :default => false, :desc => "Overwrite existing conflicting symlinks without prompting."
   def symlink(name)
     check_castle_existance(name, "symlink")
+    castle = Pathname.new(castle_dir(name))
+    nested = read_manifest(castle.parent)
 
-    inside castle_dir(name) do
+    inside castle do
+
+      # symlink our nested dirs and files
+      nested.each do |path|
+
+        homepath = Pathname.new(home_dir().join(path))
+        FileUtils.mkdir_p homepath unless homepath.exist?
+
+        castle_path = Pathname.new(castle + path)
+
+        castle_path.each_child do |child|
+          childp = Pathname.new(child.relative_path_from(castle))
+          unless children_in_manifest(childp, nested) || deepest_entry?(nested, childp)
+            make_link childp
+          end
+        end
+
+      end
+
+      # handle regular homesick symlinks
       files = Pathname.glob('{.*,*}').reject{|a| [".",".."].include?(a.to_s)}
       files.each do |path|
-        absolute_path = path.expand_path
-
-        inside home_dir do
-          adjusted_path = (home_dir + path).basename
-
-          ln_s absolute_path, adjusted_path
+        unless children_in_manifest(path, nested)
+          make_link path
         end
       end
     end
@@ -128,7 +145,7 @@ class Homesick < Thor
     if target.exist?
       if absolute_path.directory?
         move_dir_contents(target, absolute_path)
-        absolute_path.rmtree
+        remove_file absolute_path
         manifest_remove(castle, relative_dir + file.basename)
 
       elsif more_recent? absolute_path, target
@@ -274,14 +291,23 @@ class Homesick < Thor
     end
   end
 
+  def read_manifest(castle)
+    manifest_path = manifest(castle)
+    if manifest_path.exist?
+      lines = manifest_path.readlines.map { |line| Pathname.new(line.chomp) }
+    else
+      lines = []
+    end
+    lines
+  end
+
   def move_dir_contents(target, dir_path)
     child_files = dir_path.children
     child_files.each do |child|
 
       target_path = target.join(child.basename)
       if target_path.exist?
-        if more_recent?(child, target_path) && target.file?
-          target_path.delete
+        if more_recent?(child, target_path) && child.file? && !child.symlink?
           mv child, target
         end
         next
@@ -295,5 +321,40 @@ class Homesick < Thor
     first_p = Pathname.new(first)
     second_p = Pathname.new(second)
     first_p.mtime > second_p.mtime && !first_p.symlink?
+  end
+
+  def make_link(path)
+    absolute_path = path.expand_path
+
+    inside home_dir do
+      adjusted_path = (home_dir + path)
+
+      ln_s absolute_path, adjusted_path
+    end
+  end
+
+  def children_in_manifest(path, arr)
+    path_arr = []
+
+    path.find() do |p|
+      if p == path
+        next
+      end
+      path_arr << p
+    end
+
+    arr.any? do |entry|
+      path_arr.include? entry
+    end
+  end
+
+  def deepest_entry?(arr, path)
+    path = Pathname.new(path)
+
+    if path.directory?
+      unless path.each_child.any? { |e| e.directory? }
+        arr.include? path
+      end
+    end
   end
 end

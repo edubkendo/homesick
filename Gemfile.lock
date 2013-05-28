@@ -2,6 +2,7 @@ GEM
   remote: https://rubygems.org/
   specs:
     diff-lcs (1.2.4)
+    filetree (0.0.3)
     git (1.2.5)
     jeweler (1.8.4)
       bundler (~> 1.0)
@@ -33,6 +34,7 @@ PLATFORMS
   ruby
 
 DEPENDENCIES
+  filetree (>= 0.0.3)
   jeweler (>= 1.6.2)
   rake (>= 0.8.7)
   rcov
